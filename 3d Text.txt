@@ -1,0 +1,291 @@
+-----LESSON 13 - 3D TEXT-----
+
+Here's a cool example of what we can do
+
+https://www.ilithya.rocks/
+
+To do this we'll be using TextBufferGeometry but we need a particular font format - TYPEFACE
+
+You can convert a font to typeface with this site
+
+https://gero3.github.io/facetype.js/
+
+Three.js provides us with some fonts for this. We can find them in the node_modules folder
+
+  /node_modules/three/example/fonts/
+
+(They are .json() files)
+
+We can import them from here or we can take them and stick them in the static folder.
+
+To import a font from node_modules we could do
+
+  import typefaceFont from 'three/examples/fonts/helvetiker_regular.typeface.json
+
+Instead we'll put this font in our static folder by copying the refugular .json file along with LICENSE and paste them into a new /fonts folder in static.
+
+LOAD THE font
+
+We need to load the font just like we loaded textures before.
+
+We need to import the FontLoader class at the top of our script, then we can instantiate it and use it to load our font. Notice that we do not assign the font to a variable like we would a texutre. Also, we have to pass a function that gets triggered when the font has loaded.
+
+import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js"
+
+const fontLoader = new FontLoader()
+
+fontLoader.load("/fonts/helvetiker_regular.typeface.json", () => {
+  console.log("font loaded")
+})
+
+CREATE THE GEOMETRY
+
+First we need to import TextGeometry at the top of our script
+
+import { textGeometry } from "three/examples/jsm/geometries/TextGeometry.js"
+
+
+Instead of logging to the console we will create the text geometry in this text loader callback funciton. We pass it the string we want it to display and the options as an object. We will also make the materialm combine to a mesh, and add to scene:
+
+fontLoader.load("/fonts/helvetiker_regular.typeface.json", (font) => {
+  const textGeometry = new TextGeometry("James Lyddon", {
+    font,
+    size: 0.5,
+    height: 0.2,
+    curveSegments: 12,
+    bevelEnabled: true,
+    bevelThickness: 0.03,
+    bevelSize: 0.02,
+    bevelOffset: 0,
+    bevelSegments: 5,
+  })
+  const textMaterial = new THREE.MeshBasicMaterial()
+  const text = new THREE.Mesh(textGeometry, textMaterial)
+  scene.add(text)
+})
+
+If we turn on the wireframe for our text we will see it has a lot of triangles. If we want to reduce them we can optimise it by reducing the curveSegments and bevelSegments to 5 and 4 respectively. You can experiment depending on what effect you want to try to get this numbers as low as you dare.
+
+CENTER THE TEXT
+
+To help with this we will use and Axes Helper
+
+  const axesHelper = new THREE.AxesHelper()
+  scene.add(axesHelper)
+
+In case we want rotation we want the center of the text in the center.
+
+Right now the center is on the bottom left of our first letter, NOT the bevel's edge but the letter's edge before the bevel.
+
+USING THE BOUNDING
+
+This is the space taken up by our geometry. It can be a box or a sphere.
+
+The bounding helps Three.js calculate frustum culling (whether it is on the screen or not; whether or not to render specific verticies).
+
+By default THree.js uses sphere bounding. For our text we will be using a box. We can do this right after making our text geometry
+
+  textGeometry.computeBoundingBox()
+
+This gives us a Box3, which is not a physical box but a mathematical box (coorinates).
+
+The bevel is causing our geometry's bounding box coords to be less than 0 (since it overflows).
+
+Instead of moving the mesh we will move the geometry using the bounding box
+
+  textGeometry.computeBoundingBox()
+  textGeometry.translate(
+    -textGeometry.boundingBox.max.x * 0.5,
+    -textGeometry.boundingBox.max.y * 0.5,
+    -textGeometry.boundingBox.max.z * 0.5
+  )
+
+This looks centered but it is not quite because of the bevel thickness.
+
+We know how thick our bevel is because we set it when we made the geometry (0.02). To account for this, we can then include it in our translation. 0.02 is the value for x and y because this is the bevelSize. Our bevelThickness was 0.03 so we need to use this number for the z axis.
+
+const fontLoader = new FontLoader()
+
+fontLoader.load("/fonts/helvetiker_regular.typeface.json", (font) => {
+  const textGeometry = new TextGeometry("James Lyddon", {
+    font,
+    size: 0.5,
+    height: 0.2,
+    curveSegments: 5,
+    bevelEnabled: true,
+    bevelThickness: 0.03,
+    bevelSize: 0.02,
+    bevelOffset: 0,
+    bevelSegments: 4,
+  })
+  textGeometry.computeBoundingBox()
+  textGeometry.translate(
+    -(textGeometry.boundingBox.max.x - 0.02) * 0.5,
+    -(textGeometry.boundingBox.max.y - 0.02) * 0.5,
+    -(textGeometry.boundingBox.max.z - 0.03) * 0.5
+  )
+  const textMaterial = new THREE.MeshBasicMaterial({ wireframe: true })
+  const text = new THREE.Mesh(textGeometry, textMaterial)
+  scene.add(text)
+})
+
+NOW we have our text centered.
+
+This was the hard way, there is a much simpler way to do this.
+
+  textGeometry.center()
+
+ADD MATCAP MATERIAL
+
+Load the textures
+
+const textureLoader = new THREE.TextureLoader()
+const matcapTexture = textureLoader.load("/textures/matcaps/13.png")
+
+Then use it as the matcap property of a new MeshMatcapMaterial
+
+  const textMaterial = new THREE.MeshMatcapMaterial({ matcap: matcapTexture })
+  const text = new THREE.Mesh(textGeometry, textMaterial)
+
+ADD OBJECTS
+
+Let's add 100 'donuts' to our scene. Before the quick way lets look at a lower level way of doing this:
+
+for (let i = 0; i < 100; i++) {
+  const donutGeometry = new THREE.TorusGeometry(0.3, 0.2, 20, 45)
+  const donutMaterial = new THREE.MeshMatcapMaterial({ matcap: matcapTexture })
+  const donut = new THREE.Mesh(donutGeometry, donutMaterial)
+
+  scene.add(donut)
+}
+
+This would put 100 donuts in the center of the scene, which would look like a single donut. Let's add random position and rotation to our loop.
+
+for (let i = 0; i < 100; i++) {
+  const donutGeometry = new THREE.TorusGeometry(0.3, 0.2, 20, 45)
+  const donutMaterial = new THREE.MeshMatcapMaterial({ matcap: matcapTexture })
+  const donut = new THREE.Mesh(donutGeometry, donutMaterial)
+
+  donut.position.x = (Math.random() - 0.5) * 10
+  donut.position.y = (Math.random() - 0.5) * 10
+  donut.position.z = (Math.random() - 0.5) * 10
+
+  donut.rotation.x = Math.random() * Math.PI
+  donut.rotation.y = Math.random() * Math.PI
+
+  scene.add(donut)
+}
+
+Now our donuts are all spaced out and rotated randomly. Let's go further and add random size. To keep the proportion of the donuts uniform we use one random value for all the scale axes rather than one each like we did with position and rotation.
+
+  const scale = Math.random() + 0.3
+  donut.scale.x = scale
+  donut.scale.y = scale
+  donut.scale.z = scale
+
+Some of the donuts were too small so I made the minimum 0.3 but simply adding it to the scale variable
+
+I could also set a minimum size without going over 1 for the maximum using a variable for the random number and a ternary for the scale variable
+
+  const randScale = Math.random()
+  const scale = randScale < 0.3 ? randScale + 0.2 : randScale
+  donut.scale.x = scale
+  donut.scale.y = scale
+  donut.scale.z = scale
+
+So this would have all donuts be 0.3 to 1.0 but no larger or smaller (before it was 0.3 to 1.3).
+
+We can also use set to assign the scale in a single LICENSE
+
+  donut.scale.set(scale, scale, scale)
+
+OPTIMIZE
+
+We can check how long this donut loop takes to run in our dev tools by logging using console.time() to start a timer before the loop and console.timeEnd() to stop the timer after the loop.
+
+console.time("donuts")
+
+for (let i = 0; i < 100; i++) {
+  const donutGeometry = new THREE.TorusGeometry(0.3, 0.2, 20, 45)
+  const donutMaterial = new THREE.MeshMatcapMaterial({ matcap: matcapTexture })
+  const donut = new THREE.Mesh(donutGeometry, donutMaterial)
+
+  donut.position.x = (Math.random() - 0.5) * 10
+  donut.position.y = (Math.random() - 0.5) * 10
+  donut.position.z = (Math.random() - 0.5) * 10
+
+  donut.rotation.x = Math.random() * Math.PI
+  donut.rotation.y = Math.random() * Math.PI
+
+  const scale = Math.random() + 0.3
+  donut.scale.x = scale
+  donut.scale.y = scale
+  donut.scale.z = scale
+
+  scene.add(donut)
+}
+
+console.timeEnd("donuts")
+
+Looking in the dev tools we'll see the following
+
+  donuts: 69.640....
+
+We can test this by reducing our loop to 50 iterations. Then we get the result
+
+  donuts: 31.527.....
+
+And for 500 donuts
+
+  donuts: 98.510....
+
+98 milliseconds might not seem bad but we should always strive to optimise for weaker hardware (after all these times are on an RTX3080).
+
+Right now we are creating a new material and a new geometry for each mesh but we can reuse geometries and materials for multiple meshes. This is as simple as moving the instatation of these before the loop and only making the meshes in the loop.
+
+console.time("donuts")
+
+for (let i = 0; i < 100; i++) {
+  const donut = new THREE.Mesh(donutGeometry, donutMaterial)
+
+  donut.position.x = (Math.random() - 0.5) * 10
+  donut.position.y = (Math.random() - 0.5) * 10
+  donut.position.z = (Math.random() - 0.5) * 10
+
+  donut.rotation.x = Math.random() * Math.PI
+  donut.rotation.y = Math.random() * Math.PI
+
+  const scale = Math.random() + 0.3
+  donut.scale.x = scale
+  donut.scale.y = scale
+  donut.scale.z = scale
+
+  scene.add(donut)
+}
+
+console.timeEnd("donuts")
+
+So now for 500 donuts, instead of 98.510 milliseconds we take
+
+  donuts: 7.27
+
+We can even make 10,000 donuts and it only takes
+
+  donuts: 54.723
+
+So we can see how big an impact this has on performance, especially for weaker machines.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
